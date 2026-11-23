@@ -9,9 +9,7 @@ export default {
       "Access-Control-Allow-Headers": "Content-Type, Authorization",
     };
 
-    if (request.method === "OPTIONS") {
-      return new Response(null, { headers: corsHeaders });
-    }
+    if (request.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
     async function supabase(table, method = "GET", body = null, query = "", extraHeaders = {}) {
       const res = await fetch(`${env.SUPABASE_URL}/rest/v1/${table}${query}`, {
@@ -30,7 +28,6 @@ export default {
       return text ? JSON.parse(text) : [];
     }
 
-    // Fetch customer Name & Profile Picture from Meta Graph API
     async function fetchMetaProfile(platform, senderId) {
       if (platform !== "facebook" && platform !== "instagram") return {};
       try {
@@ -49,20 +46,11 @@ export default {
     }
 
     async function upsertConversation(customer_id, platform, last_message, extra = {}) {
-      const payload = {
-        customer_id,
-        platform,
-        last_message,
-        updated_at: new Date().toISOString(),
-      };
+      const payload = { customer_id, platform, last_message, updated_at: new Date().toISOString() };
       if (extra.customer_name) payload.customer_name = extra.customer_name;
       if (extra.avatar_url) payload.avatar_url = extra.avatar_url;
-
       const rows = await supabase(
-        "conversations",
-        "POST",
-        payload,
-        "?on_conflict=customer_id,platform",
+        "conversations", "POST", payload, "?on_conflict=customer_id,platform",
         { "Prefer": "resolution=merge-duplicates,return=representation" }
       );
       return rows[0];
@@ -136,7 +124,6 @@ RULES:
         });
         reply = reply.replace(payMatch[0], "").trim();
       }
-
       if (reply.includes("[ESCALATE]")) {
         await supabase("staff_tickets", "POST", { customer_id, platform, message: userMessage, status: "open" });
         reply = reply.replace(/\[ESCALATE\]/g, "").trim();
@@ -270,7 +257,6 @@ RULES:
         }
       }
 
-      // 3. ROOT & ALL PAGES -> STAFF BUSINESS SUITE INBOX
       return new Response(getSuiteHTML(url.origin), {
         headers: { "Content-Type": "text/html; charset=utf-8" },
       });
@@ -282,90 +268,128 @@ RULES:
 
 function getSuiteHTML(origin) {
   return `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Magic Store — Business Suite Inbox</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Magic Store — Business Suite</title>
 <style>
+  :root {
+    --bg: #0f1115; --panel: #151820; --panel2: #1c202a; --border: #282d38;
+    --text: #f3f4f6; --muted: #9ca3af; --accent: #2563eb; --staff: #7c3aed;
+    --bot: #1e293b; --cust: #1c202a; --green: #16a34a; --red: #dc2626;
+  }
+  [data-theme="light"] {
+    --bg: #f4f5f7; --panel: #ffffff; --panel2: #f0f2f5; --border: #dcdfe4;
+    --text: #111827; --muted: #6b7280; --accent: #1877f2; --staff: #7c3aed;
+    --bot: #e5e7eb; --cust: #f0f2f5; --green: #16a34a; --red: #dc2626;
+  }
   * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
-  body { background: #0f1115; color: #f3f4f6; height: 100vh; overflow: hidden; display: flex; }
-  .login-wrap { margin: auto; background: #161920; border: 1px solid #2a2f3a; padding: 28px; width: 340px; }
-  .login-wrap h2 { margin-bottom: 6px; font-size: 18px; }
-  .login-wrap p.sub { font-size: 12px; color: #9ca3af; margin-bottom: 18px; }
-  .login-wrap input { width: 100%; padding: 10px 12px; background: #0f1115; border: 1px solid #2a2f3a; color: #fff; margin-bottom: 12px; outline: none; }
-  .login-wrap button { width: 100%; padding: 10px; background: #2563eb; color: #fff; border: none; font-weight: 600; cursor: pointer; }
+  body { background: var(--bg); color: var(--text); height: 100dvh; overflow: hidden; display: flex; }
 
-  .app { display: none; width: 100%; height: 100vh; }
-  .sidebar { width: 185px; background: #14171d; border-right: 1px solid #262b36; display: flex; flex-direction: column; flex-shrink: 0; }
-  .brand { padding: 16px; font-weight: 700; font-size: 14px; border-bottom: 1px solid #262b36; letter-spacing: 0.4px; }
-  .nav-item { padding: 11px 16px; cursor: pointer; font-size: 13px; color: #9ca3af; border-left: 3px solid transparent; }
-  .nav-item:hover, .nav-item.active { background: #1c2029; color: #fff; border-left-color: #2563eb; }
+  /* Login */
+  .login-wrap { margin: auto; background: var(--panel); border: 1px solid var(--border); padding: 28px; width: 92%; max-width: 340px; }
+  .login-wrap h2 { font-size: 18px; margin-bottom: 4px; }
+  .login-wrap p.sub { font-size: 12px; color: var(--muted); margin-bottom: 18px; }
+  .login-wrap input { width: 100%; padding: 11px 12px; background: var(--bg); border: 1px solid var(--border); color: var(--text); margin-bottom: 12px; outline: none; }
+  .login-wrap button { width: 100%; padding: 11px; background: var(--accent); color: #fff; border: none; font-weight: 600; cursor: pointer; }
 
-  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-  .section { display: none; flex: 1; overflow-y: auto; padding: 22px; }
+  /* App Shell */
+  .app { display: none; width: 100%; height: 100dvh; }
+  .sidebar { width: 190px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
+  .brand { padding: 15px 16px; font-weight: 700; font-size: 14px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .theme-btn { background: var(--panel2); border: 1px solid var(--border); color: var(--text); padding: 4px 8px; font-size: 11px; cursor: pointer; font-weight: 600; }
+  .nav-item { padding: 11px 16px; cursor: pointer; font-size: 13px; color: var(--muted); border-left: 3px solid transparent; }
+  .nav-item:hover, .nav-item.active { background: var(--panel2); color: var(--text); border-left-color: var(--accent); font-weight: 600; }
+
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+  .section { display: none; flex: 1; overflow-y: auto; padding: 20px; }
   .section.active { display: block; }
   .section.inbox-sec.active { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
 
-  /* Meta Business Suite Top Filter Bar */
-  .filter-bar { background: #161920; border-bottom: 1px solid #262b36; padding: 10px 16px; display: flex; gap: 8px; align-items: center; }
-  .ftab { padding: 6px 12px; font-size: 12px; font-weight: 600; background: #1d212b; border: 1px solid #2d3340; color: #d1d5db; cursor: pointer; }
-  .ftab.active { background: #2563eb; border-color: #2563eb; color: #fff; }
+  /* Top Filter Bar */
+  .filter-bar { background: var(--panel); border-bottom: 1px solid var(--border); padding: 9px 14px; display: flex; gap: 6px; overflow-x: auto; flex-shrink: 0; }
+  .ftab { padding: 6px 12px; font-size: 12px; font-weight: 600; background: var(--panel2); border: 1px solid var(--border); color: var(--text); cursor: pointer; white-space: nowrap; }
+  .ftab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 
   /* 3-Column Suite Layout */
-  .suite-grid { flex: 1; display: flex; overflow: hidden; }
-  .conv-col { width: 310px; background: #13161c; border-right: 1px solid #262b36; display: flex; flex-direction: column; flex-shrink: 0; }
-  .conv-search { padding: 10px; border-bottom: 1px solid #262b36; }
-  .conv-search input { width: 100%; background: #0f1115; border: 1px solid #262b36; color: #fff; padding: 8px 10px; font-size: 12px; outline: none; }
+  .suite-grid { flex: 1; display: flex; overflow: hidden; position: relative; }
+  .conv-col { width: 300px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
+  .conv-search { padding: 10px; border-bottom: 1px solid var(--border); }
+  .conv-search input { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 8px 10px; font-size: 12px; outline: none; }
   .conv-list { flex: 1; overflow-y: auto; }
-  .conv-item { display: flex; gap: 10px; align-items: center; padding: 11px 12px; border-bottom: 1px solid #1e222b; cursor: pointer; }
-  .conv-item:hover, .conv-item.selected { background: #1c212b; }
+  .conv-item { display: flex; gap: 10px; align-items: center; padding: 11px 12px; border-bottom: 1px solid var(--border); cursor: pointer; }
+  .conv-item:hover, .conv-item.selected { background: var(--panel2); }
 
   .avatar-wrap { position: relative; width: 40px; height: 40px; flex-shrink: 0; }
-  .avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: #2563eb; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; border: 1px solid #353b48; }
-  .plat-dot { position: absolute; bottom: -2px; right: -2px; width: 16px; height: 16px; border-radius: 50%; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 1px solid #0f1115; color: #fff; }
+  .avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; border: 1px solid var(--border); }
+  .plat-dot { position: absolute; bottom: -2px; right: -2px; width: 16px; height: 16px; border-radius: 50%; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 1px solid var(--panel); color: #fff; }
   .p-facebook { background: #1877f2; }
   .p-instagram { background: #e1306c; }
   .p-whatsapp { background: #25d366; }
 
   .conv-meta { flex: 1; min-width: 0; }
   .conv-top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; }
-  .conv-name { font-size: 13px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .conv-time { font-size: 10px; color: #6b7280; flex-shrink: 0; margin-left: 6px; }
-  .conv-prev { font-size: 12px; color: #9ca3af; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .conv-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .conv-time { font-size: 10px; color: var(--muted); flex-shrink: 0; margin-left: 6px; }
+  .conv-prev { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
   /* Center Chat Pane */
-  .chat-col { flex: 1; display: flex; flex-direction: column; background: #0f1115; min-width: 0; }
-  .chat-header { padding: 10px 16px; background: #161920; border-bottom: 1px solid #262b36; display: flex; justify-content: space-between; align-items: center; min-height: 58px; }
-  .chat-body { flex: 1; padding: 18px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
-  .bubble { max-width: 72%; padding: 9px 13px; font-size: 13px; line-height: 1.45; border: 1px solid #262b36; white-space: pre-wrap; }
-  .bubble.customer { align-self: flex-start; background: #1b1f27; color: #f3f4f6; }
-  .bubble.bot { align-self: flex-end; background: #1e293b; border-color: #334155; color: #e2e8f0; }
-  .bubble.staff { align-self: flex-end; background: #7c3aed; border-color: #7c3aed; color: #ffffff; }
-  .b-meta { font-size: 10px; opacity: 0.65; margin-bottom: 3px; text-transform: uppercase; }
-  .chat-input { display: flex; border-top: 1px solid #262b36; background: #161920; }
-  .chat-input input { flex: 1; background: transparent; border: none; color: #fff; padding: 14px 16px; font-size: 13px; outline: none; }
-  .chat-input button { background: #2563eb; color: #fff; border: none; padding: 0 22px; font-weight: 600; cursor: pointer; font-size: 13px; }
+  .chat-col { flex: 1; display: flex; flex-direction: column; background: var(--bg); min-width: 0; }
+  .chat-header { padding: 10px 14px; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; min-height: 58px; gap: 8px; }
+  .chat-body { flex: 1; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+  .bubble { max-width: 78%; padding: 9px 13px; font-size: 13px; line-height: 1.45; border: 1px solid var(--border); white-space: pre-wrap; word-break: break-word; }
+  .bubble.customer { align-self: flex-start; background: var(--cust); color: var(--text); }
+  .bubble.bot { align-self: flex-end; background: var(--bot); color: var(--text); }
+  .bubble.staff { align-self: flex-end; background: var(--staff); border-color: var(--staff); color: #ffffff; }
+  .b-meta { font-size: 10px; opacity: 0.7; margin-bottom: 3px; text-transform: uppercase; font-weight: 600; }
 
-  /* Right Customer Info Column (Meta Business Suite style) */
-  .info-col { width: 270px; background: #13161c; border-left: 1px solid #262b36; padding: 16px; overflow-y: auto; flex-shrink: 0; display: none; flex-direction: column; gap: 14px; }
-  .info-head { display: flex; align-items: center; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid #262b36; }
-  .info-label { font-size: 11px; color: #9ca3af; text-transform: uppercase; font-weight: 600; margin-bottom: 6px; display: block; }
-  .info-col select, .info-col input, .info-col textarea { width: 100%; background: #0f1115; border: 1px solid #262b36; color: #fff; padding: 8px; font-size: 12px; outline: none; }
-  .info-col textarea { min-height: 85px; resize: vertical; }
+  .suggest-bar { display: none; gap: 6px; padding: 8px 12px; background: var(--panel); border-top: 1px solid var(--border); overflow-x: auto; }
+  .sug-chip { padding: 5px 10px; font-size: 11px; background: var(--panel2); border: 1px solid var(--border); color: var(--text); cursor: pointer; white-space: nowrap; }
+  .chat-input { display: flex; border-top: 1px solid var(--border); background: var(--panel); }
+  .chat-input input { flex: 1; background: transparent; border: none; color: var(--text); padding: 13px 14px; font-size: 13px; outline: none; min-width: 0; }
+  .chat-input button { background: var(--accent); color: #fff; border: none; padding: 0 20px; font-weight: 600; cursor: pointer; font-size: 13px; }
 
-  /* Shared Components */
-  h2 { font-size: 17px; margin-bottom: 14px; }
-  .card { background: #161920; border: 1px solid #262b36; padding: 16px; margin-bottom: 14px; }
-  .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
-  input { padding: 9px 10px; background: #0f1115; border: 1px solid #262b36; color: #fff; font-size: 13px; outline: none; }
-  .btn { padding: 8px 14px; background: #2563eb; color: #fff; border: none; cursor: pointer; font-weight: 600; font-size: 12px; }
-  .btn-sm { padding: 5px 10px; font-size: 12px; border: 1px solid #353b48; background: #222630; color: #fff; cursor: pointer; margin-right: 6px; }
-  .btn-green { background: #16a34a; border-color: #16a34a; }
-  .btn-red { background: #dc2626; border-color: #dc2626; }
-  table { width: 100%; border-collapse: collapse; background: #161920; border: 1px solid #262b36; font-size: 13px; }
-  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid #262b36; }
-  th { background: #1b1f27; color: #9ca3af; font-weight: 600; }
+  /* Right Info Column */
+  .info-col { width: 265px; background: var(--panel); border-left: 1px solid var(--border); padding: 16px; overflow-y: auto; flex-shrink: 0; display: none; flex-direction: column; gap: 14px; }
+  .info-head { display: flex; align-items: center; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+  .info-label { font-size: 11px; color: var(--muted); text-transform: uppercase; font-weight: 600; margin-bottom: 6px; display: block; }
+  .info-col select, .info-col input, .info-col textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 8px; font-size: 12px; outline: none; }
+  .info-col textarea { min-height: 80px; resize: vertical; }
+
+  /* Tables & Forms */
+  h2 { font-size: 16px; margin-bottom: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--border); padding: 14px; margin-bottom: 14px; }
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+  input { padding: 9px 10px; background: var(--bg); border: 1px solid var(--border); color: var(--text); font-size: 13px; outline: none; }
+  .btn { padding: 8px 14px; background: var(--accent); color: #fff; border: none; cursor: pointer; font-weight: 600; font-size: 12px; }
+  .btn-sm { padding: 5px 9px; font-size: 11px; border: 1px solid var(--border); background: var(--panel2); color: var(--text); cursor: pointer; font-weight: 600; }
+  .btn-green { background: var(--green); border-color: var(--green); color: #fff; }
+  .btn-red { background: var(--red); border-color: var(--red); color: #fff; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--border); font-size: 12px; min-width: 520px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  th { background: var(--panel2); color: var(--muted); font-weight: 600; }
+
+  /* Mobile Bottom Nav & Helpers */
+  .mob-nav { display: none; background: var(--panel); border-top: 1px solid var(--border); flex-shrink: 0; }
+  .mob-nav button { flex: 1; padding: 11px 4px; background: transparent; border: none; color: var(--muted); font-size: 11px; font-weight: 600; cursor: pointer; }
+  .mob-nav button.active { color: var(--accent); border-top: 2px solid var(--accent); }
+  .mob-only { display: none; }
+
+  @media (max-width: 820px) {
+    .app { flex-direction: column; }
+    .sidebar { display: none; }
+    .mob-nav { display: flex; }
+    .mob-only { display: inline-flex; }
+    .conv-col { width: 100%; border-right: none; }
+    .chat-col { display: none; width: 100%; }
+    .suite-grid.mob-chat-open .conv-col { display: none; }
+    .suite-grid.mob-chat-open .chat-col { display: flex; }
+    .info-col { position: absolute; inset: 0; width: 100%; z-index: 20; border-left: none; }
+    .info-col:not(.mob-info-open) { display: none !important; }
+    .info-col.mob-info-open { display: flex !important; }
+  }
 </style>
 </head>
 <body>
@@ -379,25 +403,30 @@ function getSuiteHTML(origin) {
 
   <div class="app" id="app">
     <aside class="sidebar">
-      <div class="brand">MAGIC SUITE</div>
-      <div class="nav-item active" onclick="switchTab('inbox', this)">Inbox</div>
-      <div class="nav-item" onclick="switchTab('channels', this)">Channels (FB/IG/WA)</div>
-      <div class="nav-item" onclick="switchTab('products', this)">Products</div>
-      <div class="nav-item" onclick="switchTab('payments', this)">Payments</div>
-      <div class="nav-item" onclick="switchTab('tickets', this)">Staff Tickets</div>
+      <div class="brand">
+        <span>MAGIC SUITE</span>
+        <button class="theme-btn" onclick="toggleTheme()">Theme</button>
+      </div>
+      <div class="nav-item active" data-tab="inbox" onclick="switchTab('inbox')">Inbox</div>
+      <div class="nav-item" data-tab="channels" onclick="switchTab('channels')">Channels (FB/IG/WA)</div>
+      <div class="nav-item" data-tab="products" onclick="switchTab('products')">Products</div>
+      <div class="nav-item" data-tab="payments" onclick="switchTab('payments')">Payments</div>
+      <div class="nav-item" data-tab="tickets" onclick="switchTab('tickets')">Staff Tickets</div>
       <div class="nav-item" style="margin-top:auto;" onclick="logout()">Logout</div>
     </aside>
 
     <div class="main">
-      <!-- 1. META BUSINESS SUITE STYLE INBOX -->
+      <!-- 1. INBOX -->
       <div id="inbox" class="section inbox-sec active">
         <div class="filter-bar">
-          <button class="ftab active" onclick="setFilter('all', this)">All messages</button>
+          <button class="ftab active" onclick="setFilter('all', this)">All</button>
           <button class="ftab" onclick="setFilter('facebook', this)">Messenger</button>
           <button class="ftab" onclick="setFilter('instagram', this)">Instagram</button>
           <button class="ftab" onclick="setFilter('whatsapp', this)">WhatsApp</button>
+          <button class="ftab mob-only" style="margin-left:auto;" onclick="toggleTheme()">Theme</button>
         </div>
-        <div class="suite-grid">
+
+        <div class="suite-grid" id="suiteGrid">
           <div class="conv-col">
             <div class="conv-search"><input id="convSearch" placeholder="Search customer..." oninput="renderConvs()" /></div>
             <div class="conv-list" id="convItems"></div>
@@ -405,16 +434,22 @@ function getSuiteHTML(origin) {
 
           <div class="chat-col">
             <div class="chat-header" id="chatHeader">
-              <span style="color:#9ca3af;font-size:13px;">Select a customer to view conversation</span>
+              <span style="color:var(--muted);font-size:13px;">Select a customer to view conversation</span>
             </div>
             <div class="chat-body" id="chatBody"></div>
+            <div class="suggest-bar" id="suggestBar">
+              <button class="sug-chip" onclick="useSug('Assalamu Alaikum! Magic Store-e shagotom. Ki product lagbe bolun?')">Welcome</button>
+              <button class="sug-chip" onclick="useSug('bKash / Nagad Personal: 01XXXXXXXXX (Send Money kore TrxID din)')">Payment Info</button>
+              <button class="sug-chip" onclick="useSug('Payment received! 5-10 minute-er moddhe delivery peye jaben.')">Order Confirmed</button>
+            </div>
             <form class="chat-input" id="replyForm" onsubmit="sendStaffReply(event)" style="display:none;">
-              <input id="replyInput" placeholder="Reply directly to customer..." autocomplete="off" required />
+              <input id="replyInput" placeholder="Reply to customer..." autocomplete="off" required />
               <button type="submit">Send</button>
             </form>
           </div>
 
           <div class="info-col" id="infoCol">
+            <button class="btn-sm mob-only" style="align-self:flex-start;" onclick="closeMobInfo()">← Back to Chat</button>
             <div class="info-head" id="infoHead"></div>
             <div>
               <label class="info-label">Order / Lead Status</label>
@@ -426,12 +461,12 @@ function getSuiteHTML(origin) {
               </select>
             </div>
             <div>
-              <label class="info-label">Labels (comma separated)</label>
+              <label class="info-label">Labels</label>
               <input id="infoLabels" placeholder="e.g. Priority, VIP" />
             </div>
             <div>
               <label class="info-label">Staff Notes</label>
-              <textarea id="infoNotes" placeholder="Add internal notes about this customer..."></textarea>
+              <textarea id="infoNotes" placeholder="Internal notes..."></textarea>
             </div>
             <button class="btn" onclick="saveCustomerMeta()">Save Details</button>
           </div>
@@ -441,7 +476,7 @@ function getSuiteHTML(origin) {
       <!-- 2. CHANNELS -->
       <div id="channels" class="section">
         <h2>Connect Facebook, Instagram & WhatsApp</h2>
-        <div class="card" style="font-size:13px;line-height:1.7;">
+        <div class="card" style="font-size:12px;line-height:1.8;word-break:break-all;">
           <div><b>Webhook Callback URL:</b> <code style="color:#60a5fa;">${origin}/webhook/meta</code></div>
           <div><b>Verify Token:</b> <code style="color:#60a5fa;">magicstore_verify_2026</code></div>
         </div>
@@ -458,21 +493,30 @@ function getSuiteHTML(origin) {
           <input id="pDel" placeholder="Delivery Info" />
           <button class="btn" onclick="addProduct()">+ Add Product</button>
         </div>
-        <table><thead><tr><th>Name</th><th>Price</th><th>Stock</th><th>Action</th></tr></thead><tbody id="prodList"></tbody></table>
+        <div class="table-wrap"><table><thead><tr><th>Name</th><th>Price</th><th>Stock</th><th>Action</th></tr></thead><tbody id="prodList"></tbody></table></div>
       </div>
 
       <!-- 4. PAYMENTS -->
       <div id="payments" class="section">
         <h2>Payment Verification</h2>
-        <table><thead><tr><th>Customer</th><th>Product</th><th>TrxID</th><th>Status</th><th>Action</th></tr></thead><tbody id="payList"></tbody></table>
+        <div class="table-wrap"><table><thead><tr><th>Customer</th><th>Product</th><th>TrxID</th><th>Status</th><th>Action</th></tr></thead><tbody id="payList"></tbody></table></div>
       </div>
 
       <!-- 5. TICKETS -->
       <div id="tickets" class="section">
         <h2>Escalated Staff Tickets</h2>
-        <table><thead><tr><th>Customer</th><th>Platform</th><th>Message</th><th>Status</th><th>Action</th></tr></thead><tbody id="ticketList"></tbody></table>
+        <div class="table-wrap"><table><thead><tr><th>Customer</th><th>Platform</th><th>Message</th><th>Status</th><th>Action</th></tr></thead><tbody id="ticketList"></tbody></table></div>
       </div>
     </div>
+
+    <!-- Mobile Bottom Navigation -->
+    <nav class="mob-nav">
+      <button class="active" data-tab="inbox" onclick="switchTab('inbox')">Inbox</button>
+      <button data-tab="channels" onclick="switchTab('channels')">Channels</button>
+      <button data-tab="products" onclick="switchTab('products')">Products</button>
+      <button data-tab="payments" onclick="switchTab('payments')">Payments</button>
+      <button data-tab="tickets" onclick="switchTab('tickets')">Tickets</button>
+    </nav>
   </div>
 
 <script>
@@ -481,6 +525,14 @@ function getSuiteHTML(origin) {
   let FILTER = "all";
   let ACTIVE_CONV = null;
   let LAST_MSG_COUNT = 0;
+
+  if (localStorage.getItem("ms_theme") === "light") document.documentElement.setAttribute("data-theme", "light");
+  function toggleTheme() {
+    const cur = document.documentElement.getAttribute("data-theme");
+    const next = cur === "light" ? "dark" : "light";
+    document.documentElement.setAttribute("data-theme", next);
+    localStorage.setItem("ms_theme", next);
+  }
 
   async function api(path, method = "GET", body = null) {
     const res = await fetch("/api/staff/" + path, {
@@ -494,19 +546,10 @@ function getSuiteHTML(origin) {
 
   async function login() {
     TOKEN = document.getElementById("passInput").value.trim();
-    try {
-      await api("verify");
-      localStorage.setItem("staff_pass", TOKEN);
-      startApp();
-    } catch {
-      document.getElementById("loginErr").textContent = "Wrong password!";
-    }
+    try { await api("verify"); localStorage.setItem("staff_pass", TOKEN); startApp(); }
+    catch { document.getElementById("loginErr").textContent = "Wrong password!"; }
   }
-
-  function logout() {
-    localStorage.removeItem("staff_pass");
-    location.reload();
-  }
+  function logout() { localStorage.removeItem("staff_pass"); location.reload(); }
 
   function startApp() {
     document.getElementById("loginBox").style.display = "none";
@@ -514,19 +557,17 @@ function getSuiteHTML(origin) {
     loadConvs();
     setInterval(() => {
       if (document.getElementById("inbox").classList.contains("active")) {
-        loadConvs(true);
+        loadConvs();
         if (ACTIVE_CONV) loadMessages(ACTIVE_CONV, true);
       }
     }, 3000);
   }
-
   if (TOKEN) api("verify").then(startApp).catch(() => localStorage.removeItem("staff_pass"));
 
-  function switchTab(id, el) {
+  function switchTab(id) {
     document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
-    document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+    document.querySelectorAll("[data-tab]").forEach(n => n.classList.toggle("active", n.dataset.tab === id));
     document.getElementById(id).classList.add("active");
-    el.classList.add("active");
     if (id === "inbox") loadConvs();
     if (id === "channels") loadChannels();
     if (id === "products") loadProducts();
@@ -544,120 +585,93 @@ function getSuiteHTML(origin) {
   function avatarHTML(c) {
     const name = c.customer_name || c.customer_id || "?";
     const init = name.slice(0, 2).toUpperCase();
-    const img = c.avatar_url
-      ? \`<img class="avatar" src="\${c.avatar_url}" onerror="this.style.display='none'" />\`
-      : \`<div class="avatar">\${init}</div>\`;
+    const img = c.avatar_url ? \`<img class="avatar" src="\${c.avatar_url}" onerror="this.style.display='none'" />\` : \`<div class="avatar">\${init}</div>\`;
     const pChar = c.platform === "facebook" ? "F" : c.platform === "instagram" ? "I" : "W";
     return \`<div class="avatar-wrap">\${img}<span class="plat-dot p-\${c.platform}">\${pChar}</span></div>\`;
   }
 
-  async function loadConvs() {
-    try { CONVS = await api("conversations"); renderConvs(); } catch {}
-  }
+  async function loadConvs() { try { CONVS = await api("conversations"); renderConvs(); } catch {} }
 
   function renderConvs() {
     const q = (document.getElementById("convSearch").value || "").toLowerCase();
-    const list = CONVS.filter(c => {
-      if (FILTER !== "all" && c.platform !== FILTER) return false;
-      return (c.customer_name || c.customer_id).toLowerCase().includes(q) || (c.last_message || "").toLowerCase().includes(q);
-    });
+    const list = CONVS.filter(c => (FILTER === "all" || c.platform === FILTER) && ((c.customer_name || c.customer_id).toLowerCase().includes(q) || (c.last_message || "").toLowerCase().includes(q)));
     document.getElementById("convItems").innerHTML = list.map(c => {
       const sel = ACTIVE_CONV && ACTIVE_CONV.id === c.id ? "selected" : "";
       const time = c.updated_at ? new Date(c.updated_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
-      return \`
-        <div class="conv-item \${sel}" onclick='selectConv(\${JSON.stringify(c).replace(/'/g, "&#39;")})'>
-          \${avatarHTML(c)}
-          <div class="conv-meta">
-            <div class="conv-top-row">
-              <span class="conv-name">\${c.customer_name || c.customer_id}</span>
-              <span class="conv-time">\${time}</span>
-            </div>
-            <div class="conv-prev">\${c.last_message || ""}</div>
-          </div>
-        </div>\`;
-    }).join("") || '<div style="padding:18px;font-size:12px;color:#6b7280;">No messages found. Connect FB/IG/WA in Channels tab.</div>';
+      return \`<div class="conv-item \${sel}" onclick='selectConv(\${JSON.stringify(c).replace(/'/g, "&#39;")})'>
+        \${avatarHTML(c)}
+        <div class="conv-meta">
+          <div class="conv-top-row"><span class="conv-name">\${c.customer_name || c.customer_id}</span><span class="conv-time">\${time}</span></div>
+          <div class="conv-prev">\${c.last_message || ""}</div>
+        </div>
+      </div>\`;
+    }).join("") || '<div style="padding:18px;font-size:12px;color:var(--muted);">No messages yet. Connect FB/IG/WA in Channels.</div>';
   }
 
   function selectConv(c) {
-    ACTIVE_CONV = c;
-    LAST_MSG_COUNT = 0;
-    renderConvs();
-    renderChatHeader();
+    ACTIVE_CONV = c; LAST_MSG_COUNT = 0;
+    document.getElementById("suiteGrid").classList.add("mob-chat-open");
+    renderConvs(); renderChatHeader();
     document.getElementById("replyForm").style.display = "flex";
-
-    // Right Info Panel
-    const info = document.getElementById("infoCol");
-    info.style.display = "flex";
-    document.getElementById("infoHead").innerHTML = \`
-      \${avatarHTML(c)}
-      <div style="min-width:0;">
-        <div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">\${c.customer_name || c.customer_id}</div>
-        <div style="font-size:11px;color:#9ca3af;text-transform:uppercase;">\${c.platform} • \${c.customer_id}</div>
-      </div>\`;
+    document.getElementById("suggestBar").style.display = "flex";
+    document.getElementById("infoCol").style.display = "flex";
+    document.getElementById("infoHead").innerHTML = \`\${avatarHTML(c)}<div style="min-width:0;"><div style="font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">\${c.customer_name || c.customer_id}</div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;">\${c.platform}</div></div>\`;
     document.getElementById("infoStatus").value = c.status || "New";
     document.getElementById("infoLabels").value = c.labels || "";
     document.getElementById("infoNotes").value = c.notes || "";
-
     loadMessages(c, false);
   }
+
+  function closeMobChat() { document.getElementById("suiteGrid").classList.remove("mob-chat-open"); }
+  function openMobInfo() { document.getElementById("infoCol").classList.add("mob-info-open"); }
+  function closeMobInfo() { document.getElementById("infoCol").classList.remove("mob-info-open"); }
+  function useSug(txt) { document.getElementById("replyInput").value = txt; document.getElementById("replyInput").focus(); }
 
   function renderChatHeader() {
     const c = ACTIVE_CONV;
     document.getElementById("chatHeader").innerHTML = \`
-      <div style="display:flex;align-items:center;gap:10px;">
+      <div style="display:flex;align-items:center;gap:8px;min-width:0;">
+        <button class="btn-sm mob-only" onclick="closeMobChat()">←</button>
         \${avatarHTML(c)}
-        <div>
-          <div style="font-size:14px;font-weight:600;">\${c.customer_name || c.customer_id}</div>
-          <div style="font-size:11px;color:#9ca3af;text-transform:capitalize;">\${c.platform}</div>
+        <div style="min-width:0;">
+          <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">\${c.customer_name || c.customer_id}</div>
+          <div style="font-size:11px;color:var(--muted);text-transform:capitalize;">\${c.platform}</div>
         </div>
       </div>
-      <button class="btn-sm \${c.ai_enabled ? 'btn-green' : 'btn-red'}" onclick="toggleAI()">
-        AI Auto-Reply: \${c.ai_enabled ? "ON" : "PAUSED"}
-      </button>\`;
+      <div style="display:flex;gap:6px;flex-shrink:0;">
+        <button class="btn-sm \${c.ai_enabled ? 'btn-green' : 'btn-red'}" onclick="toggleAI()">AI: \${c.ai_enabled ? "ON" : "OFF"}</button>
+        <button class="btn-sm mob-only" onclick="openMobInfo()">Info</button>
+      </div>\`;
   }
 
   async function toggleAI() {
-    ACTIVE_CONV.ai_enabled = !ACTIVE_CONV.ai_enabled;
-    renderChatHeader();
+    ACTIVE_CONV.ai_enabled = !ACTIVE_CONV.ai_enabled; renderChatHeader();
     await api("conversations/meta", "PATCH", { id: ACTIVE_CONV.id, ai_enabled: ACTIVE_CONV.ai_enabled });
   }
-
   async function saveCustomerMeta() {
     const status = document.getElementById("infoStatus").value;
     const labels = document.getElementById("infoLabels").value.trim();
     const notes = document.getElementById("infoNotes").value.trim();
     await api("conversations/meta", "PATCH", { id: ACTIVE_CONV.id, status, labels, notes });
     ACTIVE_CONV.status = status; ACTIVE_CONV.labels = labels; ACTIVE_CONV.notes = notes;
-    alert("Customer details saved!");
+    alert("Saved!");
   }
-
   async function loadMessages(conv, silent = false) {
     const msgs = await api(\`messages?customer_id=\${encodeURIComponent(conv.customer_id)}&platform=\${conv.platform}\`);
     if (silent && msgs.length === LAST_MSG_COUNT) return;
     LAST_MSG_COUNT = msgs.length;
     const body = document.getElementById("chatBody");
-    body.innerHTML = msgs.map(m => \`
-      <div class="bubble \${m.sender}">
-        <div class="b-meta">\${m.sender}</div>
-        \${m.message.replace(/</g, "&lt;")}
-      </div>\`).join("");
+    body.innerHTML = msgs.map(m => \`<div class="bubble \${m.sender}"><div class="b-meta">\${m.sender}</div>\${m.message.replace(/</g, "&lt;")}</div>\`).join("");
     body.scrollTop = body.scrollHeight;
   }
-
   async function sendStaffReply(e) {
-    e.preventDefault();
-    if (!ACTIVE_CONV) return;
-    const input = document.getElementById("replyInput");
-    const text = input.value.trim();
-    if (!text) return;
+    e.preventDefault(); if (!ACTIVE_CONV) return;
+    const input = document.getElementById("replyInput"); const text = input.value.trim(); if (!text) return;
     input.value = "";
     const body = document.getElementById("chatBody");
-    const div = document.createElement("div");
-    div.className = "bubble staff";
+    const div = document.createElement("div"); div.className = "bubble staff";
     div.innerHTML = \`<div class="b-meta">staff</div>\${text.replace(/</g, "&lt;")}\`;
-    body.appendChild(div);
-    body.scrollTop = body.scrollHeight;
-    LAST_MSG_COUNT++;
+    body.appendChild(div); body.scrollTop = body.scrollHeight; LAST_MSG_COUNT++;
     await api("reply", "POST", { customer_id: ACTIVE_CONV.customer_id, platform: ACTIVE_CONV.platform, message: text });
     loadConvs();
   }
@@ -666,9 +680,9 @@ function getSuiteHTML(origin) {
     const chans = await api("channels");
     document.getElementById("channelList").innerHTML = chans.map(ch => \`
       <div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-          <strong style="text-transform:uppercase;font-size:14px;">\${ch.platform}</strong>
-          <label style="font-size:12px;cursor:pointer;"><input type="checkbox" id="act_\${ch.platform}" \${ch.is_active ? "checked" : ""} /> Active</label>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <strong style="text-transform:uppercase;font-size:13px;">\${ch.platform}</strong>
+          <label style="font-size:12px;"><input type="checkbox" id="act_\${ch.platform}" \${ch.is_active ? "checked" : ""} /> Active</label>
         </div>
         <div class="form-grid">
           <input id="pid_\${ch.platform}" value="\${ch.page_or_phone_id || ""}" placeholder="\${ch.platform === 'whatsapp' ? 'Phone Number ID' : 'Page / IG Account ID'}" />
@@ -678,7 +692,6 @@ function getSuiteHTML(origin) {
         </div>
       </div>\`).join("");
   }
-
   async function saveChannel(platform) {
     await api("channels", "PATCH", {
       platform,
@@ -692,20 +705,17 @@ function getSuiteHTML(origin) {
 
   async function loadProducts() {
     const prods = await api("products");
-    document.getElementById("prodList").innerHTML = prods.map(p => \`
-      <tr><td>\${p.name}</td><td>\${p.price}</td><td>\${p.in_stock ? "In Stock" : "Out of Stock"}</td>
-      <td><button class="btn-sm" onclick="toggleStock(\${p.id}, \${!p.in_stock})">Toggle Stock</button><button class="btn-sm btn-red" onclick="delProduct(\${p.id})">Delete</button></td></tr>\`).join("");
+    document.getElementById("prodList").innerHTML = prods.map(p => \`<tr><td>\${p.name}</td><td>\${p.price}</td><td>\${p.in_stock ? "In Stock" : "Out"}</td><td><button class="btn-sm" onclick="toggleStock(\${p.id}, \${!p.in_stock})">Toggle</button> <button class="btn-sm btn-red" onclick="delProduct(\${p.id})">Del</button></td></tr>\`).join("");
   }
   async function addProduct() {
     await api("products", "POST", { name: document.getElementById("pName").value, price: document.getElementById("pPrice").value, description: document.getElementById("pDesc").value, delivery_info: document.getElementById("pDel").value });
-    ["pName","pPrice","pDesc","pDel"].forEach(id => document.getElementById(id).value = "");
-    loadProducts();
+    ["pName","pPrice","pDesc","pDel"].forEach(id => document.getElementById(id).value = ""); loadProducts();
   }
   async function toggleStock(id, in_stock) { await api("products", "PATCH", { id, in_stock }); loadProducts(); }
   async function delProduct(id) { await api("products?id=" + id, "DELETE"); loadProducts(); }
   async function loadPayments() {
     const pays = await api("payments");
-    document.getElementById("payList").innerHTML = pays.map(p => \`<tr><td>\${p.customer_id}</td><td>\${p.product_name}</td><td><b>\${p.trx_id}</b></td><td>\${p.status}</td><td><button class="btn-sm btn-green" onclick="updatePay(\${p.id}, 'approved')">Approve</button><button class="btn-sm btn-red" onclick="updatePay(\${p.id}, 'rejected')">Reject</button></td></tr>\`).join("");
+    document.getElementById("payList").innerHTML = pays.map(p => \`<tr><td>\${p.customer_id}</td><td>\${p.product_name}</td><td><b>\${p.trx_id}</b></td><td>\${p.status}</td><td><button class="btn-sm btn-green" onclick="updatePay(\${p.id}, 'approved')">Approve</button> <button class="btn-sm btn-red" onclick="updatePay(\${p.id}, 'rejected')">Reject</button></td></tr>\`).join("");
   }
   async function updatePay(id, status) { await api("payments", "PATCH", { id, status }); loadPayments(); }
   async function loadTickets() {
